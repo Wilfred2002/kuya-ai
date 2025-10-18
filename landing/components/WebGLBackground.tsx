@@ -1,35 +1,42 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
 export default function WebGLBackground() {
-  const [mounted, setMounted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    if (!containerRef.current) {
+      console.log('Container ref not available');
+      return;
+    }
 
-  useEffect(() => {
-    if (!mounted || !containerRef.current) return;
+    console.log('WebGL Background initializing...');
+    console.log('Container element:', containerRef.current);
 
-    // Configuration
-    const WAVE_SEGMENTS = 128;
-    const WAVE_SIZE = 800;
+    try {
+      // Configuration for Neural Network Effect
+    const MAX_NODES = 200;
+    const MAX_CONNECTIONS = 100;
+    const NODE_SIZE = 8;
+    const CONNECTION_WIDTH = 2;
+    const PULSE_SPEED = 0.02;
+    const CONNECTION_DISTANCE = 150;
 
     // Setup scene
     const scene = new THREE.Scene();
 
     // Setup camera
-    const camera = new THREE.PerspectiveCamera(
-      75,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      2000
+    const camera = new THREE.OrthographicCamera(
+      window.innerWidth / -2,
+      window.innerWidth / 2,
+      window.innerHeight / 2,
+      window.innerHeight / -2,
+      1,
+      1000
     );
-    camera.position.set(0, 200, 400);
-    camera.lookAt(0, 0, 0);
+    camera.position.z = 500;
 
     // Setup renderer
     const renderer = new THREE.WebGLRenderer({
@@ -41,128 +48,205 @@ export default function WebGLBackground() {
     renderer.setClearColor(0x000000, 0);
     containerRef.current.appendChild(renderer.domElement);
 
-    // Create fluid wave plane with custom shader
-    const geometry = new THREE.PlaneGeometry(
-      WAVE_SIZE,
-      WAVE_SIZE,
-      WAVE_SEGMENTS,
-      WAVE_SEGMENTS
-    );
+    console.log('Canvas added to DOM, size:', window.innerWidth, 'x', window.innerHeight);
+    console.log('WebGL context:', renderer.getContext());
+    console.log('Canvas element:', renderer.domElement);
 
-    // Custom vertex shader for wave animation
-    const vertexShader = `
-      uniform float uTime;
-      uniform vec2 uMouse;
-      uniform float uMouseStrength;
+    // Neural Network data structures
+    interface NeuralNode {
+      position: THREE.Vector3;
+      velocity: THREE.Vector3;
+      pulse: number; // 0 to 1, pulsing animation
+      connections: number[]; // indices of connected nodes
+      active: boolean;
+    }
 
-      varying vec2 vUv;
-      varying float vElevation;
+    interface Connection {
+      from: number;
+      to: number;
+      strength: number; // 0 to 1
+      dataFlow: number; // 0 to 1, flowing data animation
+    }
+
+    const nodes: NeuralNode[] = [];
+    const connections: Connection[] = [];
+    const mouse = new THREE.Vector2(0, 0);
+
+    // Create geometry for neural nodes
+    const nodeGeometry = new THREE.BufferGeometry();
+    const nodePositions = new Float32Array(MAX_NODES * 3);
+    const nodeColors = new Float32Array(MAX_NODES * 3);
+    const nodeSizes = new Float32Array(MAX_NODES);
+
+    nodeGeometry.setAttribute('position', new THREE.BufferAttribute(nodePositions, 3));
+    nodeGeometry.setAttribute('color', new THREE.BufferAttribute(nodeColors, 3));
+    nodeGeometry.setAttribute('size', new THREE.BufferAttribute(nodeSizes, 1));
+
+    // Create geometry for connections
+    const connectionGeometry = new THREE.BufferGeometry();
+    const connectionPositions = new Float32Array(MAX_CONNECTIONS * 6); // 2 points per line
+    const connectionColors = new Float32Array(MAX_CONNECTIONS * 6);
+    const connectionWidths = new Float32Array(MAX_CONNECTIONS);
+
+    connectionGeometry.setAttribute('position', new THREE.BufferAttribute(connectionPositions, 3));
+    connectionGeometry.setAttribute('color', new THREE.BufferAttribute(connectionColors, 3));
+    connectionGeometry.setAttribute('width', new THREE.BufferAttribute(connectionWidths, 1));
+
+    // Custom vertex shader for neural nodes
+    const nodeVertexShader = `
+      attribute float size;
+      attribute vec3 color;
+
+      varying vec3 vColor;
+      varying float vPulse;
 
       void main() {
-        vUv = uv;
+        vColor = color;
+        vPulse = color.g; // Pulse is encoded in green channel
 
-        vec3 pos = position;
-
-        // Base wave motion
-        float wave1 = sin(pos.x * 0.01 + uTime * 0.5) * 15.0;
-        float wave2 = sin(pos.y * 0.01 + uTime * 0.3) * 15.0;
-        float wave3 = sin((pos.x + pos.y) * 0.008 + uTime * 0.7) * 10.0;
-
-        // Mouse ripple effect
-        vec2 mousePos = uMouse * 400.0; // Scale to world coordinates
-        float distanceToMouse = distance(pos.xy, mousePos);
-        float ripple = sin(distanceToMouse * 0.05 - uTime * 3.0) * uMouseStrength;
-        ripple *= smoothstep(300.0, 0.0, distanceToMouse);
-
-        // Combine waves
-        pos.z = wave1 + wave2 + wave3 + ripple * 30.0;
-
-        vElevation = pos.z;
-
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = size * (300.0 / -mvPosition.z);
+        gl_Position = projectionMatrix * mvPosition;
       }
     `;
 
-    // Custom fragment shader for color gradient
-    const fragmentShader = `
-      uniform float uTime;
-
-      varying vec2 vUv;
-      varying float vElevation;
+    // Custom fragment shader for neural nodes
+    const nodeFragmentShader = `
+      varying vec3 vColor;
+      varying float vPulse;
 
       void main() {
-        // Matcha green color palette
-        vec3 colorLow = vec3(0.35, 0.62, 0.30);    // #5a9e4d
-        vec3 colorMid = vec3(0.49, 0.72, 0.43);    // #7cb96d
-        vec3 colorHigh = vec3(0.54, 0.72, 0.52);   // #8bb885
+        vec2 center = gl_PointCoord - vec2(0.5);
+        float dist = length(center);
 
-        // Map elevation to color
-        float mixStrength = (vElevation + 30.0) / 60.0;
-        mixStrength = clamp(mixStrength, 0.0, 1.0);
+        // Neural node shape - circular with pulsing effect
+        float nodeShape = 1.0 - smoothstep(0.0, 0.5, dist);
+        
+        // Pulsing glow effect
+        float pulse = sin(vPulse * 3.14159) * 0.3 + 0.7;
+        float glow = nodeShape * pulse;
 
-        vec3 color = mix(colorLow, colorHigh, mixStrength);
+        // Bright center with outer glow
+        float innerGlow = 1.0 - smoothstep(0.0, 0.3, dist);
+        float outerGlow = 1.0 - smoothstep(0.2, 0.6, dist);
 
-        // Add subtle shimmer based on UV and time
-        float shimmer = sin(vUv.x * 20.0 + uTime) * sin(vUv.y * 20.0 - uTime) * 0.05;
-        color += shimmer;
+        // Neural network colors - bright green/cyan
+        vec3 nodeColor = vColor * (1.0 + innerGlow * 0.5);
+        nodeColor += vec3(0.2, 0.4, 0.3) * outerGlow * pulse;
 
-        // Fade edges
-        float alpha = 1.0 - smoothstep(0.3, 1.0, length(vUv - 0.5) * 2.0);
-        alpha = clamp(alpha, 0.2, 0.95);
+        float alpha = glow * 0.9;
 
-        gl_FragColor = vec4(color, alpha);
+        gl_FragColor = vec4(nodeColor, alpha);
       }
     `;
 
-    const material = new THREE.ShaderMaterial({
-      vertexShader,
-      fragmentShader,
-      uniforms: {
-        uTime: { value: 0 },
-        uMouse: { value: new THREE.Vector2(0, 0) },
-        uMouseStrength: { value: 0 }
-      },
+    // Create materials
+    const nodeMaterial = new THREE.ShaderMaterial({
+      vertexShader: nodeVertexShader,
+      fragmentShader: nodeFragmentShader,
       transparent: true,
-      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
     });
 
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.rotation.x = -Math.PI / 3; // Tilt the plane
-    scene.add(mesh);
+    const connectionMaterial = new THREE.LineBasicMaterial({
+      color: 0x66ff88,
+      transparent: true,
+      opacity: 0.6,
+      blending: THREE.AdditiveBlending,
+    });
 
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambientLight);
+    // Create neural network objects
+    const nodePoints = new THREE.Points(nodeGeometry, nodeMaterial);
+    const connectionLines = new THREE.LineSegments(connectionGeometry, connectionMaterial);
+    
+    scene.add(nodePoints);
+    scene.add(connectionLines);
+    
+    // Initialize neural network nodes
+    console.log('Initializing neural network...');
+    for (let i = 0; i < MAX_NODES; i++) {
+      nodes.push({
+        position: new THREE.Vector3(
+          (Math.random() - 0.5) * window.innerWidth,
+          (Math.random() - 0.5) * window.innerHeight,
+          (Math.random() - 0.5) * 200
+        ),
+        velocity: new THREE.Vector3(
+          (Math.random() - 0.5) * 0.5,
+          (Math.random() - 0.5) * 0.5,
+          (Math.random() - 0.5) * 0.5
+        ),
+        pulse: Math.random(),
+        connections: [],
+        active: true,
+      });
+    }
 
-    const pointLight = new THREE.PointLight(0x8bb885, 1, 1000);
-    pointLight.position.set(0, 200, 100);
-    scene.add(pointLight);
+    // Create connections between nearby nodes - limit long lines
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const distance = nodes[i].position.distanceTo(nodes[j].position);
+        
+        // Only connect nodes that are close together (shorter lines)
+        const maxConnectionDistance = CONNECTION_DISTANCE * 0.6; // 60% of original distance
+        
+        if (distance < maxConnectionDistance && connections.length < MAX_CONNECTIONS) {
+          // Add some randomness to avoid too many connections
+          if (Math.random() > 0.3) { // Only 70% chance to connect
+            connections.push({
+              from: i,
+              to: j,
+              strength: 1.0 - (distance / maxConnectionDistance),
+              dataFlow: Math.random(),
+            });
+            nodes[i].connections.push(j);
+            nodes[j].connections.push(i);
+          }
+        }
+      }
+    }
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    directionalLight.position.set(1, 1, 0.5);
-    scene.add(directionalLight);
+    // Neural network color palette - AI-inspired greens and cyans
+    const neuralColors = [
+      new THREE.Color(0x00ff88), // Bright neural green
+      new THREE.Color(0x66ffaa), // Light green
+      new THREE.Color(0x88ffcc), // Cyan-green
+      new THREE.Color(0xaaffdd), // Light cyan
+    ];
 
-    // Mouse tracking
-    const mouse = new THREE.Vector2(0, 0);
-    const targetMouse = new THREE.Vector2(0, 0);
-    let mouseStrength = 0;
-
+    // Mouse tracking for neural network interaction
     const handleMouseMove = (event: MouseEvent) => {
-      targetMouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-      targetMouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-      mouseStrength = 1.0; // Activate ripple on mouse move
-    };
+      mouse.x = event.clientX - window.innerWidth / 2;
+      mouse.y = -(event.clientY - window.innerHeight / 2);
 
-    const handleMouseLeave = () => {
-      mouseStrength = 0;
+      // Activate nearby nodes when mouse moves
+      const mousePos = new THREE.Vector3(mouse.x, mouse.y, 0);
+      const activationRadius = 100;
+
+      for (let i = 0; i < nodes.length; i++) {
+        const distance = nodes[i].position.distanceTo(mousePos);
+        if (distance < activationRadius) {
+          // Boost pulse and activity of nearby nodes
+          nodes[i].pulse = Math.min(nodes[i].pulse + 0.1, 1.0);
+          nodes[i].active = true;
+          
+          // Add slight attraction to mouse
+          const attraction = (activationRadius - distance) / activationRadius;
+          const direction = mousePos.clone().sub(nodes[i].position).normalize();
+          nodes[i].velocity.add(direction.multiplyScalar(attraction * 0.02));
+        }
+      }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseleave', handleMouseLeave);
 
     // Handle window resize
     const handleResize = () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.left = window.innerWidth / -2;
+      camera.right = window.innerWidth / 2;
+      camera.top = window.innerHeight / 2;
+      camera.bottom = window.innerHeight / -2;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     };
@@ -176,24 +260,126 @@ export default function WebGLBackground() {
     const animate = () => {
       animationId = requestAnimationFrame(animate);
 
+      const deltaTime = clock.getDelta();
       const elapsedTime = clock.getElapsedTime();
+      
+      // Debug: log every 60 frames (about once per second)
+      if (Math.floor(elapsedTime * 60) % 60 === 0) {
+        console.log('Neural network running, nodes:', nodes.length, 'connections:', connections.length);
+      }
 
-      // Smooth mouse interpolation
-      mouse.x += (targetMouse.x - mouse.x) * 0.1;
-      mouse.y += (targetMouse.y - mouse.y) * 0.1;
+      // Update neural network nodes
+      for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i];
 
-      // Decay mouse strength
-      mouseStrength *= 0.95;
+        // Update pulse animation
+        node.pulse += PULSE_SPEED;
+        if (node.pulse > 1.0) node.pulse = 0.0;
 
-      // Update shader uniforms
-      material.uniforms.uTime.value = elapsedTime;
-      material.uniforms.uMouse.value.copy(mouse);
-      material.uniforms.uMouseStrength.value = mouseStrength;
+        // Gentle floating movement
+        node.position.add(node.velocity);
 
-      // Gentle camera sway
-      camera.position.x = Math.sin(elapsedTime * 0.1) * 50 + mouse.x * 30;
-      camera.position.y = 200 + Math.cos(elapsedTime * 0.15) * 20 + mouse.y * 30;
-      camera.lookAt(0, 0, 0);
+        // Add subtle floating motion
+        node.position.x += Math.sin(elapsedTime * 0.3 + i * 0.1) * 0.2;
+        node.position.y += Math.cos(elapsedTime * 0.4 + i * 0.15) * 0.2;
+
+        // Keep nodes within bounds
+        if (node.position.x > window.innerWidth / 2) node.position.x = -window.innerWidth / 2;
+        if (node.position.x < -window.innerWidth / 2) node.position.x = window.innerWidth / 2;
+        if (node.position.y > window.innerHeight / 2) node.position.y = -window.innerHeight / 2;
+        if (node.position.y < -window.innerHeight / 2) node.position.y = window.innerHeight / 2;
+
+        // Gradually slow down velocity
+        node.velocity.multiplyScalar(0.98);
+      }
+
+      // Update connections data flow
+      for (let i = 0; i < connections.length; i++) {
+        connections[i].dataFlow += 0.02;
+        if (connections[i].dataFlow > 1.0) connections[i].dataFlow = 0.0;
+      }
+
+      // Update node geometry
+      for (let i = 0; i < MAX_NODES; i++) {
+        if (i < nodes.length) {
+          const node = nodes[i];
+          const index = i * 3;
+
+          // Position
+          nodePositions[index] = node.position.x;
+          nodePositions[index + 1] = node.position.y;
+          nodePositions[index + 2] = node.position.z;
+
+          // Color based on activity and pulse
+          const colorIndex = Math.floor(node.pulse * (neuralColors.length - 1));
+          const color = neuralColors[Math.min(colorIndex, neuralColors.length - 1)];
+
+          nodeColors[index] = color.r;
+          nodeColors[index + 1] = node.pulse; // Encode pulse in green for shader
+          nodeColors[index + 2] = color.b;
+
+          // Size based on activity
+          const sizeMultiplier = node.active ? 1.2 : 1.0;
+          nodeSizes[i] = NODE_SIZE * sizeMultiplier * (0.8 + Math.random() * 0.4);
+        } else {
+          // Hide unused nodes
+          nodePositions[i * 3] = 0;
+          nodePositions[i * 3 + 1] = 0;
+          nodePositions[i * 3 + 2] = -1000;
+          nodeSizes[i] = 0;
+        }
+      }
+
+      // Update connection geometry
+      for (let i = 0; i < MAX_CONNECTIONS; i++) {
+        if (i < connections.length) {
+          const connection = connections[i];
+          const fromNode = nodes[connection.from];
+          const toNode = nodes[connection.to];
+          const index = i * 6;
+
+          // From position
+          connectionPositions[index] = fromNode.position.x;
+          connectionPositions[index + 1] = fromNode.position.y;
+          connectionPositions[index + 2] = fromNode.position.z;
+
+          // To position
+          connectionPositions[index + 3] = toNode.position.x;
+          connectionPositions[index + 4] = toNode.position.y;
+          connectionPositions[index + 5] = toNode.position.z;
+
+          // Connection colors based on data flow
+          const flowIntensity = Math.sin(connection.dataFlow * Math.PI * 2) * 0.3 + 0.7;
+          const baseColor = new THREE.Color(0x66ff88);
+          
+          connectionColors[index] = baseColor.r * flowIntensity;
+          connectionColors[index + 1] = baseColor.g * flowIntensity;
+          connectionColors[index + 2] = baseColor.b * flowIntensity;
+          connectionColors[index + 3] = baseColor.r * flowIntensity;
+          connectionColors[index + 4] = baseColor.g * flowIntensity;
+          connectionColors[index + 5] = baseColor.b * flowIntensity;
+
+          connectionWidths[i] = CONNECTION_WIDTH * connection.strength * flowIntensity;
+        } else {
+          // Hide unused connections
+          connectionPositions[i * 6] = 0;
+          connectionPositions[i * 6 + 1] = 0;
+          connectionPositions[i * 6 + 2] = -1000;
+          connectionPositions[i * 6 + 3] = 0;
+          connectionPositions[i * 6 + 4] = 0;
+          connectionPositions[i * 6 + 5] = -1000;
+          connectionWidths[i] = 0;
+        }
+      }
+
+      nodeGeometry.attributes.position.needsUpdate = true;
+      nodeGeometry.attributes.color.needsUpdate = true;
+      nodeGeometry.attributes.size.needsUpdate = true;
+      nodeGeometry.setDrawRange(0, Math.min(nodes.length, MAX_NODES));
+
+      connectionGeometry.attributes.position.needsUpdate = true;
+      connectionGeometry.attributes.color.needsUpdate = true;
+      connectionGeometry.setDrawRange(0, Math.min(connections.length * 2, MAX_CONNECTIONS * 2));
 
       renderer.render(scene, camera);
     };
@@ -207,28 +393,32 @@ export default function WebGLBackground() {
       }
 
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseleave', handleMouseLeave);
       window.removeEventListener('resize', handleResize);
 
       if (containerRef.current && renderer.domElement) {
         containerRef.current.removeChild(renderer.domElement);
       }
 
-      geometry.dispose();
-      material.dispose();
+      nodeGeometry.dispose();
+      nodeMaterial.dispose();
+      connectionGeometry.dispose();
+      connectionMaterial.dispose();
       renderer.dispose();
     };
-  }, [mounted]);
-
-  if (!mounted) {
-    return null;
-  }
+    } catch (error) {
+      console.error('WebGL Background initialization failed:', error);
+    }
+  }, []);
 
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 -z-10"
-      style={{ width: '100vw', height: '100vh' }}
+      className="fixed inset-0 pointer-events-none"
+      style={{
+        width: '100vw',
+        height: '100vh',
+        zIndex: 0
+      }}
     />
   );
 }

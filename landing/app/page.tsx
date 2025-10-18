@@ -36,11 +36,11 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col relative">
+    <div className="min-h-screen flex flex-col relative" style={{ isolation: 'isolate' }}>
       <WebGLBackground />
 
       {/* Header */}
-      <header className="w-full px-6 py-6 md:px-12 md:py-8 animate-fade-in">
+      <header className="w-full px-6 py-6 md:px-12 md:py-8 animate-fade-in relative z-10">
         <div className="max-w-7xl mx-auto">
           <div className="text-2xl md:text-3xl font-bold tracking-tight text-matcha-800 font-[family-name:var(--font-space-mono)] uppercase">
             KUYA
@@ -49,7 +49,7 @@ export default function Home() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex items-center justify-center px-6 py-12 md:py-20">
+      <main className="flex-1 flex items-center justify-center px-6 py-12 md:py-20 relative z-10">
         <div className="max-w-3xl w-full space-y-12">
           {/* Hero Section */}
           <div className="text-center animate-fade-in animate-delay-100">
@@ -111,7 +111,7 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full px-6 py-8 md:px-12 md:py-10 border-t border-matcha-200 bg-white/30 backdrop-blur-sm animate-fade-in animate-delay-300">
+      <footer className="w-full px-6 py-8 md:px-12 md:py-10 border-t border-matcha-200 bg-white/30 backdrop-blur-sm animate-fade-in animate-delay-300 relative z-10">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6 font-[family-name:var(--font-space-mono)] uppercase">
             <div className="text-matcha-700 text-xs md:text-sm">
