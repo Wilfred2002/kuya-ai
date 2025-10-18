@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, readFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import path from 'path';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-const WAITLIST_FILE = path.join(DATA_DIR, 'waitlist.json');
+// NOTE: This is a simple in-memory implementation for demo purposes.
+// For production, replace with a database (Supabase, PostgreSQL, etc.)
+// Emails are logged to console and can be viewed in Vercel logs.
 
-interface WaitlistEntry {
-  email: string;
-  timestamp: string;
-}
+const waitlistEmails = new Set<string>();
 
 // Simple email validation
 function isValidEmail(email: string): boolean {
@@ -37,42 +32,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Ensure data directory exists
-    if (!existsSync(DATA_DIR)) {
-      await mkdir(DATA_DIR, { recursive: true });
-    }
+    const normalizedEmail = email.toLowerCase();
 
-    // Read existing waitlist or create new one
-    let waitlist: WaitlistEntry[] = [];
-    if (existsSync(WAITLIST_FILE)) {
-      const fileContent = await readFile(WAITLIST_FILE, 'utf-8');
-      waitlist = JSON.parse(fileContent);
-    }
-
-    // Check if email already exists
-    const emailExists = waitlist.some(
-      (entry) => entry.email.toLowerCase() === email.toLowerCase()
-    );
-
-    if (emailExists) {
+    // Check if email already exists (in current session)
+    if (waitlistEmails.has(normalizedEmail)) {
       return NextResponse.json(
         { error: 'Email already registered' },
         { status: 400 }
       );
     }
 
-    // Add new email
-    const newEntry: WaitlistEntry = {
-      email: email.toLowerCase(),
-      timestamp: new Date().toISOString(),
-    };
+    // Add to in-memory set
+    waitlistEmails.add(normalizedEmail);
 
-    waitlist.push(newEntry);
-
-    // Save updated waitlist
-    await writeFile(WAITLIST_FILE, JSON.stringify(waitlist, null, 2));
-
-    console.log(`New waitlist signup: ${email}`);
+    // Log to console (visible in Vercel deployment logs)
+    console.log(`[WAITLIST SIGNUP] ${normalizedEmail} - ${new Date().toISOString()}`);
 
     return NextResponse.json(
       { success: true, message: 'Successfully joined the waitlist' },

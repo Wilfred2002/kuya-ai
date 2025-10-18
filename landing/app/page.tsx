@@ -28,7 +28,7 @@ export default function Home() {
         setStatus('error');
         setMessage(data.error || 'Something went wrong. Please try again.');
       }
-    } catch (error) {
+    } catch {
       setStatus('error');
       setMessage('Something went wrong. Please try again.');
     }
@@ -65,9 +65,9 @@ export default function Home() {
           {/* Hero Section */}
           <div className="text-center animate-fade-in animate-delay-100">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-light tracking-tight text-matcha-900 leading-[1.1]">
-              We're making AI
+              We&apos;re making AI
               <br />
-              <span className="font-bold font-[family-name:var(--font-space-mono)] uppercase">NATIVE</span> to group
+              <span className="font-bold">native</span> to group
               <br />
               conversations.
             </h1>
@@ -126,7 +126,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6 font-[family-name:var(--font-space-mono)] uppercase">
             <div className="text-matcha-700 text-xs md:text-sm">
-              © 2025 Kuya AI. Making conversations smarter.
+              © 2025 Kuya.
             </div>
 
             <div className="flex gap-8 text-xs md:text-sm">
