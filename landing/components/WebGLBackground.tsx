@@ -1,66 +1,51 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-
-declare global {
-  interface Window {
-    VANTA: {
-      WAVES: (options: VantaWavesOptions) => VantaEffect;
-    };
-  }
-}
+import { useEffect, useRef, useState } from 'react';
 
 interface VantaEffect {
   destroy: () => void;
   resize: () => void;
 }
 
-interface VantaWavesOptions {
-  el: HTMLElement;
-  THREE?: unknown;
-  mouseControls?: boolean;
-  touchControls?: boolean;
-  gyroControls?: boolean;
-  minHeight?: number;
-  minWidth?: number;
-  scale?: number;
-  scaleMobile?: number;
-  color?: number;
-  shininess?: number;
-  waveHeight?: number;
-  waveSpeed?: number;
-  zoom?: number;
-}
-
 export default function WebGLBackground() {
+  const [mounted, setMounted] = useState(false);
   const vantaRef = useRef<HTMLDivElement>(null);
   const vantaEffect = useRef<VantaEffect | null>(null);
 
   useEffect(() => {
-    if (!vantaRef.current) return;
+    setMounted(true);
+  }, []);
 
-    // Dynamically import THREE and VANTA
+  useEffect(() => {
+    if (!mounted || !vantaRef.current || vantaEffect.current) return;
+
+    // Dynamically import THREE and VANTA only on client side
     const loadVanta = async () => {
-      const THREE = await import('three');
-      const VANTA = await import('vanta/dist/vanta.waves.min.js');
+      try {
+        const THREE = await import('three');
+        const VANTA = await import('vanta/dist/vanta.waves.min.js');
 
-      if (vantaRef.current && !vantaEffect.current) {
-        vantaEffect.current = (VANTA as unknown as { default: typeof window.VANTA }).default.WAVES({
-          el: vantaRef.current,
-          THREE: THREE,
-          mouseControls: true,
-          touchControls: true,
-          gyroControls: false,
-          minHeight: 200.0,
-          minWidth: 200.0,
-          scale: 1.0,
-          scaleMobile: 1.0,
-          color: 0x5a9e4d, // Matcha green
-          shininess: 30.0,
-          waveHeight: 15.0,
-          waveSpeed: 0.75,
-          zoom: 0.85,
-        });
+        if (vantaRef.current && !vantaEffect.current) {
+          // @ts-ignore - Vanta types are not perfect
+          vantaEffect.current = VANTA.default({
+            el: vantaRef.current,
+            THREE: THREE,
+            mouseControls: true,
+            touchControls: true,
+            gyroControls: false,
+            minHeight: 200.0,
+            minWidth: 200.0,
+            scale: 1.0,
+            scaleMobile: 1.0,
+            color: 0x5a9e4d, // Matcha green
+            shininess: 30.0,
+            waveHeight: 15.0,
+            waveSpeed: 0.75,
+            zoom: 0.85,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load Vanta.js:', error);
       }
     };
 
@@ -72,7 +57,11 @@ export default function WebGLBackground() {
         vantaEffect.current = null;
       }
     };
-  }, []);
+  }, [mounted]);
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <div
