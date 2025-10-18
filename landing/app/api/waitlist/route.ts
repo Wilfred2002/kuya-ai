@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// NOTE: This is a simple in-memory implementation for demo purposes.
-// For production, replace with a database (Supabase, PostgreSQL, etc.)
-// Emails are logged to console and can be viewed in Vercel logs.
-
-const waitlistEmails = new Set<string>();
+import { supabase } from '@/lib/supabase';
 
 // Simple email validation
 function isValidEmail(email: string): boolean {
@@ -34,18 +29,42 @@ export async function POST(request: NextRequest) {
 
     const normalizedEmail = email.toLowerCase();
 
-    // Check if email already exists (in current session)
-    if (waitlistEmails.has(normalizedEmail)) {
+    // Check if email already exists
+    const { data: existingEmail, error: checkError } = await supabase
+      .from('waitlist')
+      .select('email')
+      .eq('email', normalizedEmail)
+      .single();
+
+    if (checkError && checkError.code !== 'PGRST116') {
+      // PGRST116 = no rows returned (email doesn't exist yet, which is good)
+      console.error('Database check error:', checkError);
+      return NextResponse.json(
+        { error: 'Database error occurred' },
+        { status: 500 }
+      );
+    }
+
+    if (existingEmail) {
       return NextResponse.json(
         { error: 'Email already registered' },
         { status: 400 }
       );
     }
 
-    // Add to in-memory set
-    waitlistEmails.add(normalizedEmail);
+    // Insert new email
+    const { error: insertError } = await supabase
+      .from('waitlist')
+      .insert([{ email: normalizedEmail }]);
 
-    // Log to console (visible in Vercel deployment logs)
+    if (insertError) {
+      console.error('Database insert error:', insertError);
+      return NextResponse.json(
+        { error: 'Failed to save email' },
+        { status: 500 }
+      );
+    }
+
     console.log(`[WAITLIST SIGNUP] ${normalizedEmail} - ${new Date().toISOString()}`);
 
     return NextResponse.json(

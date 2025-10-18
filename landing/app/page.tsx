@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import WebGLBackground from '@/components/WebGLBackground';
 
 export default function Home() {
   const [email, setEmail] = useState('');
@@ -35,28 +36,16 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-matcha-50 to-background">
+    <div className="min-h-screen flex flex-col relative">
+      <WebGLBackground />
+
       {/* Header */}
       <header className="w-full px-6 py-6 md:px-12 md:py-8 animate-fade-in">
-        <nav className="max-w-7xl mx-auto flex items-center justify-between">
+        <div className="max-w-7xl mx-auto">
           <div className="text-2xl md:text-3xl font-bold tracking-tight text-matcha-800 font-[family-name:var(--font-space-mono)] uppercase">
             KUYA
           </div>
-          <div className="flex gap-6 text-sm md:text-base font-[family-name:var(--font-space-mono)] uppercase">
-            <a
-              href="#about"
-              className="text-matcha-700 hover:text-matcha-900 transition-colors duration-200"
-            >
-              About
-            </a>
-            <a
-              href="#waitlist"
-              className="text-matcha-700 hover:text-matcha-900 transition-colors duration-200"
-            >
-              Join
-            </a>
-          </div>
-        </nav>
+        </div>
       </header>
 
       {/* Main Content */}
