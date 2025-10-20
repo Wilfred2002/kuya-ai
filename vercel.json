@@ -1,11 +1,11 @@
 {
-  "buildCommand": "cd landing && npm run build",
-  "outputDirectory": "landing/.next",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
   "framework": "nextjs",
-  "installCommand": "cd landing && npm install",
-  "devCommand": "cd landing && npm run dev",
+  "installCommand": "npm install",
+  "devCommand": "npm run dev",
   "functions": {
-    "landing/app/api/waitlist/route.ts": {
+    "app/api/waitlist/route.ts": {
       "maxDuration": 10
     }
   }
