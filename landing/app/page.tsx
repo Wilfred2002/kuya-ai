@@ -23,7 +23,7 @@ export default function Home() {
 
       if (response.ok) {
         setStatus('success');
-        setMessage('Thanks! You\'re on the list.');
+        setMessage(data.message || 'Thanks! You\'re on the list.');
         setEmail('');
       } else {
         setStatus('error');

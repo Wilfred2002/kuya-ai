@@ -47,8 +47,8 @@ export async function POST(request: NextRequest) {
 
     if (existingEmail) {
       return NextResponse.json(
-        { error: 'Email already registered' },
-        { status: 400 }
+        { message: "You're already on the list!" },
+        { status: 200 }
       );
     }
 
