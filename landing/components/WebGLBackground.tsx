@@ -7,13 +7,14 @@ export default function WebGLBackground() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!containerRef.current) {
+    const container = containerRef.current;
+    if (!container) {
       console.log('Container ref not available');
       return;
     }
 
     console.log('WebGL Background initializing...');
-    console.log('Container element:', containerRef.current);
+    console.log('Container element:', container);
 
     try {
       // Configuration for Neural Network Effect
@@ -46,7 +47,7 @@ export default function WebGLBackground() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setClearColor(0x000000, 0);
-    containerRef.current.appendChild(renderer.domElement);
+    container.appendChild(renderer.domElement);
 
     console.log('Canvas added to DOM, size:', window.innerWidth, 'x', window.innerHeight);
     console.log('WebGL context:', renderer.getContext());
@@ -260,7 +261,6 @@ export default function WebGLBackground() {
     const animate = () => {
       animationId = requestAnimationFrame(animate);
 
-      const deltaTime = clock.getDelta();
       const elapsedTime = clock.getElapsedTime();
       
       // Debug: log every 60 frames (about once per second)
@@ -395,8 +395,8 @@ export default function WebGLBackground() {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('resize', handleResize);
 
-      if (containerRef.current && renderer.domElement) {
-        containerRef.current.removeChild(renderer.domElement);
+      if (container && renderer.domElement) {
+        container.removeChild(renderer.domElement);
       }
 
       nodeGeometry.dispose();
